@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer utilities {
+  /* Animate spins at a more gentle, luxurious speed for our gold certificate seal */
+  .animate-spin-slow {
+    animation: spin 16s linear infinite;
+  }
+}
+
+/* Custom print media overrides to ensure certificates format impeccably on paper / PDF */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  #writing-workspace, #setup-stage-container, #teacher-evaluation-portal {
+    display: none !important;
+  }
+  .page-break-before {
+    page-break-before: always;
+  }
+}

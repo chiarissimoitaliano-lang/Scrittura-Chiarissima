@@ -1,0 +1,6 @@
+{
+  "name": "Scrittura Chiarissima",
+  "description": "Laboratorio di scrittura in lingua italiana con tutor IA, correzioni in tempo reale, creazione di glossari e percorsi di evoluzione narrativa interattivi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
