@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getApiUrl } from "./utils/api";
 import SetupStage from "./components/SetupStage";
 import WritingWorkspace from "./components/WritingWorkspace";
 import EvaluationCertificate from "./components/EvaluationCertificate";
@@ -44,7 +45,7 @@ export default function App() {
   // API Call: Request Tutor Review (Fase 3)
   const handleTutorRequest = async (currentText: string): Promise<TutorResponse> => {
     // Collect the past history / text block
-    const response = await fetch("/api/tutor/analyze", {
+    const response = await fetch(getApiUrl("/api/tutor/analyze"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -66,7 +67,7 @@ export default function App() {
 
   // API Call: Extract Story Glossary
   const handleGenerateGlossary = async (currentText: string): Promise<GlossaryTerm[]> => {
-    const response = await fetch("/api/tutor/glossary", {
+    const response = await fetch(getApiUrl("/api/tutor/glossary"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

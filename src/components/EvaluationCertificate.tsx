@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { GlossaryTerm, VocabularyTerm, TeacherEvaluation } from "../types";
+import { getApiUrl } from "../utils/api";
 import { 
   Award, 
   BookOpen, 
@@ -90,7 +91,7 @@ export default function EvaluationCertificate({
     setSubmissionError(null);
 
     try {
-      const response = await fetch("/api/stories", {
+      const response = await fetch(getApiUrl("/api/stories"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,7 +126,7 @@ export default function EvaluationCertificate({
     if (!submission) return;
     setIsCheckingStatus(true);
     try {
-      const response = await fetch("/api/stories");
+      const response = await fetch(getApiUrl("/api/stories"));
       if (response.ok) {
         const list: SubmittedStory[] = await response.json();
         const current = list.find(s => s.id === submission.id);

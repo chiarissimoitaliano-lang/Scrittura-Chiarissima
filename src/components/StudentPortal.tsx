@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "../utils/api";
 import { 
   ArrowLeft, 
   Search, 
@@ -46,7 +47,7 @@ export default function StudentPortal({ onBack }: StudentPortalProps) {
       setIsLoading(true);
       setErrorMsg(null);
       try {
-        const response = await fetch("/api/stories");
+        const response = await fetch(getApiUrl("/api/stories"));
         if (!response.ok) {
           throw new Error("Errore durante il recupero dei compiti.");
         }

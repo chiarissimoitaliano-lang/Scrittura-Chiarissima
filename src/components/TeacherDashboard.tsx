@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "../utils/api";
 import { 
   ArrowLeft, 
   Search, 
@@ -63,7 +64,7 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const response = await fetch("/api/stories");
+      const response = await fetch(getApiUrl("/api/stories"));
       if (!response.ok) {
         throw new Error("Impossibile caricare i compiti dagli studenti.");
       }
@@ -108,7 +109,7 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
 
     setIsSavingEvaluation(true);
     try {
-      const response = await fetch(`/api/stories/${selectedSub.id}/evaluate`, {
+      const response = await fetch(getApiUrl(`/api/stories/${selectedSub.id}/evaluate`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -147,7 +148,7 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
     }
 
     try {
-      const response = await fetch(`/api/stories/${id}`, {
+      const response = await fetch(getApiUrl(`/api/stories/${id}`), {
         method: "DELETE"
       });
 

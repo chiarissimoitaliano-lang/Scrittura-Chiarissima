@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getApiUrl } from "../utils/api";
 import { starters } from "../data/starters";
 import { 
   Compass, 
@@ -90,7 +91,7 @@ export default function SetupStage({ onStart, onOpenTeacher, onOpenStudentPortal
     setApiError(null);
 
     try {
-      const response = await fetch("/api/tutor/custom-starter", {
+      const response = await fetch(getApiUrl("/api/tutor/custom-starter"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
