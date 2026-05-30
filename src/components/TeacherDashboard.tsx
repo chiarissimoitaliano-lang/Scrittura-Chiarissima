@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { getApiUrl } from "../utils/api";
+import { 
+  apiGetStories, 
+  apiEvaluateStory, 
+  apiDeleteStory, 
+  importSubmissionFromCode, 
+  exportSubmissionToCode, 
+  apiAddOrUpdateStoryDirectly 
+} from "../utils/api";
 import { 
   ArrowLeft, 
   Search, 
@@ -59,16 +66,40 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
   const [isSavingEvaluation, setIsSavingEvaluation] = useState<boolean>(false);
   const [evaluationSuccess, setEvaluationSuccess] = useState<boolean>(false);
 
+  // State for manual student code import/sync
+  const [pastedCompitoCode, setPastedCompitoCode] = useState<string>("");
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const handleImportCompito = () => {
+    if (!pastedCompitoCode.trim()) return;
+    const importedStory = importSubmissionFromCode(pastedCompitoCode);
+    if (!importedStory || !importedStory.id) {
+      setImportStatus("❌ Codice compito non valido! Verifica che inizi con 'SC_'.");
+      return;
+    }
+    // Inject directly into local database
+    apiAddOrUpdateStoryDirectly(importedStory);
+    // Refresh submissions lists
+    setSubmissions(prev => {
+      const exists = prev.findIndex(s => s.id === importedStory.id);
+      if (exists !== -1) {
+        return prev.map(s => s.id === importedStory.id ? importedStory : s);
+      } else {
+        return [importedStory, ...prev];
+      }
+    });
+    setSelectedSub(importedStory);
+    setImportStatus("🎉 Compito caricato con successo!");
+    setPastedCompitoCode("");
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
   // Fetch all submissions
   const fetchSubmissions = async () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const response = await fetch(getApiUrl("/api/stories"));
-      if (!response.ok) {
-        throw new Error("Impossibile caricare i compiti dagli studenti.");
-      }
-      const data = await response.json();
+      const data = await apiGetStories();
       setSubmissions(data);
     } catch (err: any) {
       console.error(err);
@@ -109,23 +140,13 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
 
     setIsSavingEvaluation(true);
     try {
-      const response = await fetch(getApiUrl(`/api/stories/${selectedSub.id}/evaluate`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teacherName: teacherNameInput,
-          gradeGrammar,
-          gradeVocabulary,
-          gradeContent,
-          feedback: feedback.trim()
-        })
+      const updatedSub = await apiEvaluateStory(selectedSub.id, {
+        teacherName: teacherNameInput,
+        gradeGrammar,
+        gradeVocabulary,
+        gradeContent,
+        feedback: feedback.trim()
       });
-
-      if (!response.ok) {
-        throw new Error("Errore durante il salvataggio della valutazione.");
-      }
-
-      const updatedSub = await response.json();
       
       // Update local lists
       setSubmissions(prev => prev.map(s => s.id === updatedSub.id ? updatedSub : s));
@@ -133,7 +154,7 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
       setEvaluationSuccess(true);
       
       // Clear after time
-      setTimeout(() => setEvaluationSuccess(false), 3000);
+      setTimeout(() => setEvaluationSuccess(false), 5000);
     } catch (err: any) {
       alert(err.message || "Errore nel salvataggio del commento.");
     } finally {
@@ -148,14 +169,7 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
     }
 
     try {
-      const response = await fetch(getApiUrl(`/api/stories/${id}`), {
-        method: "DELETE"
-      });
-
-      if (!response.ok) {
-        throw new Error("Impossibile eliminare il compito.");
-      }
-
+      await apiDeleteStory(id);
       // Remove from list
       setSubmissions(prev => prev.filter(s => s.id !== id));
       if (selectedSub?.id === id) {
@@ -288,6 +302,38 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Import Assignment from Code Widget */}
+            <div className="bg-white border-2 border-emerald-100 rounded-2xl p-4.5 space-y-3.5 shadow-xs">
+              <h3 className="font-extrabold text-xs text-emerald-800 uppercase tracking-widest font-mono flex items-center gap-1 leading-none">
+                <Sparkles className="w-3.5 h-3.5" />
+                Carica Compito Alunno
+              </h3>
+              <p className="text-[10px] text-neutral-500 leading-relaxed font-sans">
+                Se l&apos;alunno ti ha inviato il codice compito da Netlify, incollalo qui sotto per aggiungerlo al tuo registro:
+              </p>
+              <div className="space-y-2">
+                <textarea
+                  value={pastedCompitoCode}
+                  onChange={(e) => setPastedCompitoCode(e.target.value)}
+                  placeholder="Incolla il codice SC_..."
+                  rows={2}
+                  className="w-full p-2 border border-emerald-250 rounded-lg text-[10px] text-neutral-850 font-mono bg-neutral-50 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleImportCompito}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-1.5 rounded-lg text-xs transition-all cursor-pointer shadow-xs"
+                >
+                  📥 Carica nel registro
+                </button>
+              </div>
+              {importStatus && (
+                <p className={`text-[10px] leading-tight font-bold text-center ${importStatus.startsWith("❌") ? "text-red-650" : "text-emerald-700 font-bold"}`}>
+                  {importStatus}
+                </p>
+              )}
             </div>
 
             {/* List of Student Submissions */}
@@ -563,6 +609,40 @@ export default function TeacherDashboard({ onBack }: TeacherDashboardProps) {
                     </div>
                   </form>
                 </div>
+
+                {/* Shared Evaluation Code block for Netlify / local backup */}
+                {selectedSub.status === "evaluated" && (
+                  <div className="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4.5 space-y-2.5 no-print">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      <h4 className="font-bold text-emerald-900 text-xs sm:text-xs">
+                        Codice Valutazione Alunno (Pronto per la condivisione)
+                      </h4>
+                    </div>
+                    <p className="text-[10px] text-neutral-600 leading-normal">
+                      Copia il codice criptato di questa valutazione qui sotto e invialo al tuo studente (via WhatsApp o Email). Lo studente potrà incollarlo nel suo portale per sbloccare e stampare il proprio certificato:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={exportSubmissionToCode(selectedSub)}
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                        className="flex-1 p-2 text-[10px] bg-white border border-neutral-300 rounded-lg text-neutral-800 font-mono focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(exportSubmissionToCode(selectedSub));
+                          alert("Codice valutazione copiato negli appunti! Invialo all'alunno.");
+                        }}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        📋 Copia Codice
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* 3. Render official certificate instantly below if it has been graded */}
                 {selectedSub.status === "evaluated" && (

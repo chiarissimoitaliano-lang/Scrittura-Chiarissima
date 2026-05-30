@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { getApiUrl } from "../utils/api";
+import { 
+  apiGetStories, 
+  importSubmissionFromCode, 
+  exportSubmissionToCode, 
+  apiAddOrUpdateStoryDirectly 
+} from "../utils/api";
 import { 
   ArrowLeft, 
   Search, 
@@ -41,17 +46,41 @@ export default function StudentPortal({ onBack }: StudentPortalProps) {
   const [searchName, setSearchName] = useState<string>("");
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
 
+  // Manual import states for Netlify / local offline fallback
+  const [pastedValutazione, setPastedValutazione] = useState<string>("");
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const handleImportValutazione = () => {
+    if (!pastedValutazione.trim()) return;
+    const importedSub = importSubmissionFromCode(pastedValutazione);
+    if (!importedSub || !importedSub.id) {
+      setImportStatus("❌ Codice non valido o errato! Assicurati che cominci con 'SC_'.");
+      return;
+    }
+    // Inject directly into client-side DB
+    apiAddOrUpdateStoryDirectly(importedSub);
+    // Refresh the local lists
+    setSubmissions(prev => {
+      const exists = prev.findIndex(s => s.id === importedSub.id);
+      if (exists !== -1) {
+        return prev.map(s => s.id === importedSub.id ? importedSub : s);
+      } else {
+        return [...prev, importedSub];
+      }
+    });
+    setSelectedSub(importedSub);
+    setImportStatus("🎉 Complimenti! Certificato sbloccato con successo!");
+    setPastedValutazione("");
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
   // Fetch student work
   useEffect(() => {
     const fetchAll = async () => {
       setIsLoading(true);
       setErrorMsg(null);
       try {
-        const response = await fetch(getApiUrl("/api/stories"));
-        if (!response.ok) {
-          throw new Error("Errore durante il recupero dei compiti.");
-        }
-        const data = await response.json();
+        const data = await apiGetStories();
         setSubmissions(data);
       } catch (err: any) {
         console.error(err);
@@ -123,6 +152,38 @@ export default function StudentPortal({ onBack }: StudentPortalProps) {
               <p className="text-[10px] text-neutral-400 leading-normal">
                 Digita il tuo nome per restringere l&apos;elenco e trovare la tua storia.
               </p>
+            </div>
+
+            {/* Paste Evaluation Code Widget for Netlify Users */}
+            <div className="bg-white border-2 border-emerald-100 rounded-2xl p-4.5 space-y-3.5 shadow-xs">
+              <h3 className="font-extrabold text-xs text-emerald-800 uppercase tracking-widest font-mono flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                Sblocca Certificato
+              </h3>
+              <p className="text-[10px] text-neutral-500 leading-normal">
+                Se la professoressa ti ha inviato un codice di valutazione, incollalo qui per sbloccare il certificato all&apos;istante:
+              </p>
+              <div className="space-y-2">
+                <textarea
+                  value={pastedValutazione}
+                  onChange={(e) => setPastedValutazione(e.target.value)}
+                  placeholder="Incolla il codice SC_..."
+                  rows={2}
+                  className="w-full p-2 border border-emerald-250 rounded-lg text-[10px] text-neutral-850 font-mono bg-neutral-50 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleImportValutazione}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-1.5 rounded-lg text-xs transition-all cursor-pointer shadow-xs"
+                >
+                  Sblocca Certificato
+                </button>
+              </div>
+              {importStatus && (
+                <p className={`text-[10px] leading-tight font-bold text-center ${importStatus.startsWith("❌") ? "text-red-650" : "text-emerald-700 animate-bounce"}`}>
+                  {importStatus}
+                </p>
+              )}
             </div>
 
             {/* List entries */}
@@ -287,12 +348,35 @@ export default function StudentPortal({ onBack }: StudentPortalProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-8 text-center bg-white border border-neutral-200 rounded-2xl shadow-xs text-neutral-500 space-y-1.5 no-print">
+                  <div className="p-8 text-center bg-white border border-neutral-200 rounded-2xl shadow-xs text-neutral-600 space-y-4 no-print">
                     <Sparkles className="w-5 h-5 text-amber-400 mx-auto" />
-                    <h4 className="font-bold text-neutral-800 text-xs">Arriva presto il tuo certificato!</h4>
-                    <p className="text-[11px] max-w-xs mx-auto text-neutral-450 leading-relaxed">
-                      La tua storia è conservata al sicuro nel registro docente. Non appena la professoressa Letícia avrà salvato la correzione, troverai qui tutti i dettagli e il certificato stampabile.
-                    </p>
+                    <div>
+                      <h4 className="font-bold text-neutral-800 text-sm">Arriva presto il tuo certificato! ⏳</h4>
+                      <p className="text-[11.5px] max-w-sm mx-auto text-neutral-500 leading-relaxed mt-1">
+                        La tua storia è conservata nel registro docente. Se stai usando l&apos;app su Netlify, puoi anche copiare il codice qui sotto e inviarlo direttamente alla professoressa via Email o WhatsApp:
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-250 space-y-2 max-w-md mx-auto">
+                      <span className="text-[9.5px] font-bold text-neutral-450 uppercase font-mono tracking-wider block text-center">Codice Compito dell&apos;Alunno</span>
+                      <textarea
+                        readOnly
+                        value={exportSubmissionToCode(selectedSub)}
+                        onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                        className="w-full p-2 text-[9px] bg-white border border-neutral-300 rounded-lg text-neutral-700 font-mono resize-none focus:outline-hidden"
+                        rows={2}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(exportSubmissionToCode(selectedSub));
+                          alert("Codice compito copiato con successo! Invialo alla professoressa.");
+                        }}
+                        className="w-full py-1.5 text-xs bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-lg cursor-pointer transition-all"
+                      >
+                        📋 Copia Codice Compito
+                      </button>
+                    </div>
                   </div>
                 )}
 

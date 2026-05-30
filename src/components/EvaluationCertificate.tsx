@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { GlossaryTerm, VocabularyTerm, TeacherEvaluation } from "../types";
-import { getApiUrl } from "../utils/api";
+import { 
+  apiSubmitStory, 
+  apiGetStories, 
+  exportSubmissionToCode, 
+  importSubmissionFromCode, 
+  apiAddOrUpdateStoryDirectly 
+} from "../utils/api";
 import { 
   Award, 
   BookOpen, 
@@ -91,27 +97,17 @@ export default function EvaluationCertificate({
     setSubmissionError(null);
 
     try {
-      const response = await fetch(getApiUrl("/api/stories"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentName: studentName.trim(),
-          genre,
-          level,
-          targetLength,
-          incipit,
-          studentText,
-          wordCount,
-          vocabularyUsed: vocabularyUsedList,
-          glossary
-        })
+      const savedData = await apiSubmitStory({
+        studentName: studentName.trim(),
+        genre,
+        level,
+        targetLength,
+        incipit,
+        studentText,
+        wordCount,
+        vocabularyUsed: vocabularyUsedList,
+        glossary
       });
-
-      if (!response.ok) {
-        throw new Error("Si è verificato un errore durante l'invio della storia.");
-      }
-
-      const savedData = await response.json();
       setSubmission(savedData);
     } catch (err: any) {
       console.error(err);
@@ -126,13 +122,10 @@ export default function EvaluationCertificate({
     if (!submission) return;
     setIsCheckingStatus(true);
     try {
-      const response = await fetch(getApiUrl("/api/stories"));
-      if (response.ok) {
-        const list: SubmittedStory[] = await response.json();
-        const current = list.find(s => s.id === submission.id);
-        if (current) {
-          setSubmission(current);
-        }
+      const list = await apiGetStories();
+      const current = list.find((s: any) => s.id === submission.id);
+      if (current) {
+        setSubmission(current);
       }
     } catch (err) {
       console.error("Si è verificato un errore durante la sincronizzazione della correzione:", err);
@@ -293,6 +286,72 @@ export default function EvaluationCertificate({
           </button>
         </div>
       </div>
+
+      {/* Manual homework share box for Netlify / local backup */}
+      {!isEvaluated && (
+        <div className="bg-amber-50/45 border border-amber-200 rounded-2xl p-5 space-y-3.5 shadow-xs no-print">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-600 animate-pulse" />
+            <span className="font-bold text-neutral-850 text-xs sm:text-sm">
+              Sincronizzazione Manuale per la Docente (Canale Netlify / Offline)
+            </span>
+          </div>
+          <p className="text-[11px] text-neutral-600 leading-relaxed max-w-3xl">
+            Poiché l&apos;applicazione è ospitata su un server statico (Netlify) e potrebbe non essere in grado di comunicare in tempo reale con il database, <strong>copia il codice compito criptato qui sotto</strong> e invialo direttamente alla professoressa via WhatsApp o Email per la correzione.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+            <input
+              type="text"
+              readOnly
+              value={exportSubmissionToCode(submission)}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              className="flex-1 p-2 text-[10px] bg-white border border-neutral-300 rounded-lg text-neutral-800 font-mono focus:outline-hidden"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(exportSubmissionToCode(submission));
+                alert("Codice compito copiato negli appunti! Invialo alla professoressa.");
+              }}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-xs"
+            >
+              📋 Copia Codice Compito
+            </button>
+          </div>
+          
+          <div className="pt-3 border-t border-amber-100/80 space-y-2.5">
+            <span className="text-[10px] uppercase font-mono font-bold text-neutral-500 block">
+              Hai già ricevuto il codice di valutazione della Docente? Sbloccalo qui:
+            </span>
+            <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+              <input
+                type="text"
+                placeholder="Incolla qui il codice di valutazione ricevuto SC_..."
+                id="pasted-valutazione-direct"
+                className="flex-1 p-2 text-[10px] bg-white border border-neutral-250 rounded-lg text-neutral-850 font-mono focus:outline-hidden"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const val = (document.getElementById("pasted-valutazione-direct") as HTMLInputElement)?.value;
+                  if (!val || !val.trim()) return;
+                  const imported = importSubmissionFromCode(val);
+                  if (imported && imported.id === submission.id) {
+                    apiAddOrUpdateStoryDirectly(imported);
+                    setSubmission(imported);
+                    alert("🎉 Fantastico! Valutazione caricata correttamente. Il tuo certificato di eccellenza è sbloccato!");
+                  } else {
+                    alert("❌ Codice non valido o non associato a questo specifico compito!");
+                  }
+                }}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-xs"
+              >
+                Sblocca Certificato
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* RENDER THE ACTIVE CERTIFICATE IF EVALUATED */}
       {isEvaluated ? (
