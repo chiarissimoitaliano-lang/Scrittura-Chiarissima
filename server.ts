@@ -3,7 +3,6 @@ import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 
 // Load environment variables
 dotenv.config();
@@ -386,8 +385,11 @@ COMPITI:
 
 // Express server starter and Vite middleware integration
 async function boot() {
+  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(process.cwd(), "dist"));
+
   // Vite integration for asset serving & dev system
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
